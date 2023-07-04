@@ -1,0 +1,146 @@
+---
+title: "GROUP4_MR"
+author: "Sandra"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+##Load packages required for the MR {. tabset}
+
+```{r, packages, include=FALSE, comment=NA}
+library(MRInstruments)
+library(TwoSampleMR)
+```
+
+## Loading in the exposure dataset 
+
+```{r, Exposure data,comment=NA}
+
+# Specify the file path
+file_path <- "/home/sandra/Documents/EDA_DATA/Mendelian Randomization/mrc_uganda_hackathon_202306_group4/data/yengo_BMI_656.txt"
+
+#Reading in the exposure data using function read_exposure
+bmi_exp_data <- read_exposure_data(
+    filename = file_path,
+    sep = "\t",
+    snp_col = "SNP",
+    beta_col = "BETA",
+    se_col = "SE",
+    effect_allele_col = "Tested_Allele",
+    other_allele_col = "Other_Allele",
+    eaf_col = "Freq_Tested_Allele_in_HRS",
+    pval_col = "P",
+    samplesize_col = "N"
+)
+
+#How many rows and columns are in the dataset
+
+dim(bmi_exp_data)
+head(bmi_exp_data)
+
+```
+
+## Clumping the exposure data
+
+```{r, Clumped data,  comment=NA}
+Bmi_exp_data <- clump_data(bmi_exp_data)
+#364 variants have been removed due to LD with other variants or absence from the LD reference panel
+
+dim(Bmi_exp_data)
+
+#Renaming the column for Exposure to BMI
+
+Bmi_exp_data$exposure = "BMI"
+
+```
+
+
+
+## Loading in the outcome dataset 
+```{r, Outcome_data, comment=NA}
+
+file_path = "/home/sandra/Documents/EDA_DATA/Mendelian Randomization/mrc_uganda_hackathon_202306_group4/data/PANUKB_BMI_YENGO_BMI_SNPs.txt"
+outcome_data <- read_outcome_data(
+    snps = bmi_exp_data$SNP,
+    filename = file_path,
+    sep = "\t",
+    snp_col = "rsid",
+    beta_col = "beta_AFR",
+    se_col = "se_AFR",
+    effect_allele_col = "alt",
+    other_allele_col = "ref",
+    eaf_col = "af_AFR",
+    pval_col = "neglog10_pval_AFR",
+)
+
+dim(outcome_data)
+
+outcome_data$outcome = "BMI"
+
+```
+
+
+
+## Harmonizing the data {.tabset}
+
+```{r, Harmonized data, comment=NA}
+H_data <- harmonise_data(
+    exposure_dat = Bmi_exp_data, 
+    outcome_dat = outcome_data
+)
+
+dim(H_data)
+head(H_data)
+```
+
+
+## Checking for palindromic SNPs {.tabset}
+
+
+```{r, Palidromic SNPs, comment=NA}
+
+palindromic_at <- subset(H_data,effect_allele.outcome%in% "A" & other_allele.outcome %in% "T")
+palindromic_ta <- subset(H_data,effect_allele.outcome %in% "T" & other_allele.outcome%in% "A")
+palindromic_gc <- subset(H_data,effect_allele.outcome %in% "G" & other_allele.outcome %in% "C")
+palindromic_cg <- subset(H_data,effect_allele.outcome %in% "C" & other_allele.outcome %in% "G")
+dim(palindromic_at)
+dim(palindromic_ta)
+dim(palindromic_gc)
+dim(palindromic_cg)
+
+```
+
+
+## Scatter plot for the beta estimate of the exposure and outcome to access for directionality 
+
+```{r, comment=NA}
+
+# Create the scatter plot
+plot(H_data$beta.exposure, H_data$beta.outcome, pch = 16, col = "blue", xlab = "Beta_exposure", ylab = "Beta_outcome")
+
+# Add a horizontal line
+abline(h = 0, col = "red")
+
+# Add a vertical line
+abline(v = 0, col = "green")
+```
+
+## Filtering for only SNPs with positive and negative beta estimates to obtain SNPs that are African associated {.tabset}
+
+```{r, comment=NA}
+keep <- which(H_data$beta.exposure > 0 & H_data$beta.outcome > 0)
+keep <- which(H_data$beta.exposure < 0 & H_data$beta.outcome < 0)
+H_data = H_data[keep,]
+head(H_data)
+dim(H_data)
+View(H_data)
+```
+
+
